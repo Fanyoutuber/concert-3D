@@ -42,6 +42,22 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpe
     }
   }, [artist]);
 
+  const [closing, setClosing] = useState(false);
+
+  useEffect(() => {
+    if (artist) setClosing(false);
+  }, [artist]);
+
+  // Mobile: chạy animation trượt xuống rồi mới đóng; desktop đóng ngay
+  const requestClose = () => {
+    if (window.matchMedia('(min-width: 1024px)').matches) {
+      onClose();
+      return;
+    }
+    setClosing(true);
+    window.setTimeout(onClose, 200);
+  };
+
   if (!artist) return null;
 
   const hasSubArtists = Boolean(artist.subArtists && artist.subArtists.length > 0);
@@ -59,11 +75,11 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpe
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
-      onClick={onClose}
+      className={`sheet-overlay${closing ? ' is-closing' : ''} fixed inset-0 z-50 flex items-end lg:items-center justify-center lg:p-4 bg-black/80 lg:bg-black/85 lg:backdrop-blur-md`}
+      onClick={requestClose}
     >
       <div
-        className="bg-[#15070c]/95 w-full max-w-2xl rounded-3xl border border-white/20 shadow-2xl modal-enter overflow-hidden max-h-[92vh] flex flex-col"
+        className="sheet-panel bg-[#15070c] lg:bg-[#15070c]/95 w-full lg:max-w-2xl rounded-t-3xl lg:rounded-3xl border border-white/20 shadow-2xl overflow-hidden max-h-[88vh] lg:max-h-[92vh] flex flex-col"
         style={
           {
             boxShadow: `0 25px 80px -15px rgba(0,0,0,0.95), 0 0 40px ${artist.theme.glowSoft}`,
@@ -71,6 +87,7 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpe
         }
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="sheet-grabber" />
         {/* Top Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/40">
           <div className="flex items-center gap-2.5 flex-wrap">
@@ -83,7 +100,7 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpe
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition"
           >
             <X className="w-4 h-4" />
@@ -91,21 +108,24 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpe
         </div>
 
         {/* Body Content */}
-        <div className="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+        <div className="p-4 sm:p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 items-stretch">
           {/* Left Visual Column */}
-          <div className="md:col-span-5 relative rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-b from-[#17080e] via-[#0e0408] to-[#090205] flex flex-col items-center justify-end min-h-[260px] p-4">
+          <div className="md:col-span-5 relative rounded-2xl overflow-hidden border border-white/10 bg-gradient-to-b from-[#17080e] via-[#0e0408] to-[#090205] flex flex-col items-center justify-between min-h-[240px] md:min-h-[280px] p-4">
             <div
               className="absolute inset-0 opacity-35 pointer-events-none"
               style={{
                 background: `radial-gradient(circle at 50% 20%, ${artist.theme.glowSoft} 0%, transparent 70%)`,
               }}
             />
-            <img
-              src={artist.cutoutImage}
-              alt={artist.name}
-              className="relative z-10 w-full max-h-56 object-contain object-bottom drop-shadow-[0_12px_25px_rgba(0,0,0,0.9)]"
-            />
-            <div className="relative z-10 w-full text-center mt-3 pt-2 border-t border-white/10">
+            {/* Wrapper ảnh có khoảng đệm phía trên an toàn để không bị che đầu trên mobile */}
+            <div className="relative z-10 w-full flex-1 flex items-end justify-center min-h-[160px] pt-4 pb-1">
+              <img
+                src={artist.cutoutImage}
+                alt={artist.name}
+                className="max-h-44 sm:max-h-52 md:max-h-56 w-auto max-w-full object-contain object-bottom drop-shadow-[0_12px_25px_rgba(0,0,0,0.9)]"
+              />
+            </div>
+            <div className="relative z-10 w-full text-center mt-2 pt-2 border-t border-white/10 shrink-0">
               <h3 className={`font-heading font-black text-lg uppercase ${artist.theme.titleColorClass}`}>
                 {displayName}
               </h3>
@@ -259,7 +279,7 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpe
               </button>
               <button
                 type="button"
-                onClick={onClose}
+                onClick={requestClose}
                 className="py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-slate-200 transition"
               >
                 Đóng

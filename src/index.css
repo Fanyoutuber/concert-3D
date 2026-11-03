@@ -1066,6 +1066,48 @@ h1, h2, h3, h4, .font-heading {
   animation: fadeInScale 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Bottom-sheet (mobile): chỉ animate transform/opacity -> chạy trên GPU, không reflow */
+@keyframes sheetUp {
+  from { transform: translate3d(0, 100%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes sheetDown {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, 100%, 0); }
+}
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes overlayOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (max-width: 1023px) {
+  .sheet-overlay { animation: overlayIn 0.22s ease forwards; }
+  .sheet-overlay.is-closing { animation: overlayOut 0.2s ease forwards; }
+  .sheet-panel {
+    animation: sheetUp 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    will-change: transform;
+    overscroll-behavior: contain;
+  }
+  .sheet-overlay.is-closing .sheet-panel {
+    animation: sheetDown 0.22s cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
+  .sheet-grabber {
+    width: 40px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.25);
+    margin: 8px auto 0;
+  }
+}
+@media (min-width: 1024px) {
+  .sheet-panel { animation: fadeInScale 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .sheet-grabber { display: none; }
+}
+
 
 /* =========================================================
    TABLET & MOBILE (< 1024px): VERTICAL EXPANDING 3D STAGE CARDS
@@ -1204,7 +1246,12 @@ h1, h2, h3, h4, .font-heading {
   }
 
   /* Ngăn chi tiết trên Mobile: Dùng thuần CSS Grid 0fr -> 1fr để trượt đóng/mở cực mượt 60fps */
+  /* Mobile dùng bottom-sheet (ArtistModal) thay cho drawer mở rộng tại chỗ */
   .stage-artist-card .artist-detail-drawer {
+    display: none !important;
+  }
+
+  .stage-artist-card .artist-detail-drawer-legacy {
     display: grid !important;
     grid-template-rows: 0fr;
     width: 100% !important;

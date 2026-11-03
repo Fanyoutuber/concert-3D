@@ -94,6 +94,11 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
     ) {
       return;
     }
+    // Mobile/tablet: mở bottom-sheet thay vì mở rộng thẻ (tránh reflow gây giật)
+    if (onOpenModal && !window.matchMedia('(min-width: 1024px)').matches) {
+      onOpenModal(artist);
+      return;
+    }
     onToggle(artist.key);
   };
 
@@ -174,9 +179,7 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
           <div className="card-top-badges">
             <span className={`role-pill ${artist.theme.rolePillClass}`}>
               <span
-                className={`w-1.5 h-1.5 rounded-full ${artist.theme.dotColorClass} ${
-                  artist.key === 'long' ? 'animate-ping' : 'animate-pulse'
-                }`}
+                className={`w-1.5 h-1.5 rounded-full ${artist.theme.dotColorClass} animate-pulse`}
               />
               {artist.roleBadge}
             </span>
@@ -202,9 +205,7 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
             <div className="artist-nameplate-box">
               <div className="flex items-center gap-2 justify-center lg:justify-start">
                 <span
-                  className={`w-2 h-2 rounded-full ${artist.theme.dotColorClass} ${
-                    artist.key === 'long' ? 'animate-ping' : 'animate-pulse'
-                  } shrink-0`}
+                  className={`w-2 h-2 rounded-full ${artist.theme.dotColorClass} animate-pulse shrink-0`}
                 />
                 <h3 className={`artist-stage-title ${artist.theme.titleColorClass}`}>
                   {artist.name}
