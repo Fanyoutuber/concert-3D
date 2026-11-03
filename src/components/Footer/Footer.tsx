@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ArrowUp,
   ArrowUpRight,
   Calendar,
   Mail,
@@ -140,18 +139,14 @@ export const Footer: React.FC<FooterProps> = ({ onOpenBooking }) => {
           </div>
         </div>
 
-        {/* Bottom Copyright & Back to Top */}
+        {/* Bottom Copyright */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-slate-500 text-center sm:text-left">
           <div>
             © 2026 ALO! TĐN XIN NGHE • O.L.A &amp; Ban Âm nhạc Trường THCS và THPT Trần Đại Nghĩa. All rights reserved.
           </div>
-          <a
-            href="#"
-            className="inline-flex items-center gap-1.5 text-slate-400 hover:text-white transition"
-          >
-            <span>Lên đầu trang</span>
-            <ArrowUp className="w-3.5 h-3.5" />
-          </a>
+          <span className="text-[10px] text-slate-600">
+            Show diễn âm nhạc kỷ niệm 2026
+          </span>
         </div>
       </div>
     </footer>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Coffee, Sparkles, Tag, Ticket } from 'lucide-react';
 import { PERKS } from '../../data/perks';
 import { Perk } from '../../types';
@@ -8,6 +8,25 @@ export interface PerksProps {
 }
 
 export const Perks: React.FC<PerksProps> = ({ perks = PERKS }) => {
+  const [activePerkId, setActivePerkId] = useState<string | null>(null);
+
+  // Nhấn vào chỗ khác ngoài các thẻ sẽ tắt hiệu ứng phóng to + phát sáng
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      setActivePerkId(null);
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => {
+      window.removeEventListener('click', handleGlobalClick);
+    };
+  }, []);
+
+  const handlePerkClick = (e: React.MouseEvent, perkId: string) => {
+    e.stopPropagation();
+    // Nhấn vào chính nó lần nữa thì tắt hiệu ứng, hoặc bật thẻ mới
+    setActivePerkId((prev) => (prev === perkId ? null : perkId));
+  };
+
   const renderIcon = (iconName: Perk['iconName']) => {
     switch (iconName) {
       case 'sparkles':
@@ -24,50 +43,35 @@ export const Perks: React.FC<PerksProps> = ({ perks = PERKS }) => {
   const accentStyles: Record<
     Perk['accentColor'],
     {
-      cardHover: string;
       frameGradient: string;
       badgeClass: string;
       categoryClass: string;
-      titleHover: string;
       footerClass: string;
-      imgRotateHover: string;
     }
   > = {
     rose: {
-      cardHover: 'hover:border-rose-500/50 hover:shadow-xl hover:shadow-[#8E2032]/30',
       frameGradient: 'from-rose-500/15 via-[#8E2032]/10 to-black/70',
       badgeClass: 'bg-[#8E2032]/90 text-rose-200 border-rose-500/40',
       categoryClass: 'text-rose-400',
-      titleHover: 'group-hover:text-rose-200',
       footerClass: 'text-rose-300/90',
-      imgRotateHover: 'group-hover:scale-105 group-hover:-rotate-2',
     },
     purple: {
-      cardHover: 'hover:border-amber-500/50 hover:shadow-xl hover:shadow-amber-950/30',
       frameGradient: 'from-amber-500/15 via-[#6B1724]/10 to-black/70',
       badgeClass: 'bg-amber-950/90 text-amber-200 border-amber-500/40',
       categoryClass: 'text-amber-400',
-      titleHover: 'group-hover:text-amber-200',
       footerClass: 'text-amber-300/90',
-      imgRotateHover: 'group-hover:scale-105 group-hover:rotate-2',
     },
     cyan: {
-      cardHover: 'hover:border-rose-400/50 hover:shadow-xl hover:shadow-[#8E2032]/30',
       frameGradient: 'from-[#8E2032]/25 via-white/[0.03] to-black/70',
       badgeClass: 'bg-[#6B1724]/90 text-rose-200 border-rose-400/40',
       categoryClass: 'text-rose-300',
-      titleHover: 'group-hover:text-rose-100',
       footerClass: 'text-rose-300/90',
-      imgRotateHover: 'group-hover:scale-105',
     },
     amber: {
-      cardHover: 'hover:border-amber-500/50 hover:shadow-xl hover:shadow-amber-950/30',
       frameGradient: 'from-amber-500/20 via-[#8E2032]/10 to-black/70',
       badgeClass: 'bg-amber-950/90 text-amber-300 border-amber-500/40',
       categoryClass: 'text-amber-400',
-      titleHover: 'group-hover:text-amber-200',
       footerClass: 'text-amber-300/90',
-      imgRotateHover: 'group-hover:scale-105',
     },
   };
 
@@ -92,10 +96,14 @@ export const Perks: React.FC<PerksProps> = ({ perks = PERKS }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {perks.map((perk) => {
             const style = accentStyles[perk.accentColor];
+            const isActive = activePerkId === perk.id;
             return (
               <div
                 key={perk.id}
-                className={`glass-card rounded-3xl p-5 border border-white/10 flex flex-col justify-between text-left group ${style.cardHover} transition-all duration-300`}
+                onClick={(e) => handlePerkClick(e, perk.id)}
+                className={`glass-card perk-card perk-card-${perk.accentColor} ${
+                  isActive ? 'is-active' : ''
+                } rounded-3xl p-5 border border-white/10 flex flex-col justify-between text-left cursor-pointer transition-all duration-300 select-none`}
               >
                 <div>
                   {/* Image Frame */}
@@ -110,7 +118,7 @@ export const Perks: React.FC<PerksProps> = ({ perks = PERKS }) => {
                     <img
                       src={perk.image}
                       alt={perk.name}
-                      className={`w-full h-full object-contain transition-transform duration-500 ${style.imgRotateHover} filter drop-shadow-[0_12px_24px_rgba(0,0,0,0.85)]`}
+                      className="perk-img w-full h-full object-contain filter drop-shadow-[0_12px_24px_rgba(0,0,0,0.85)]"
                       loading="lazy"
                       decoding="async"
                     />
@@ -122,9 +130,7 @@ export const Perks: React.FC<PerksProps> = ({ perks = PERKS }) => {
                     {renderIcon(perk.iconName)}
                     <span>{perk.category}</span>
                   </div>
-                  <h3
-                    className={`font-heading font-black text-lg text-white mb-1.5 ${style.titleHover} transition-colors`}
-                  >
+                  <h3 className="perk-title font-heading font-black text-lg text-white mb-1.5">
                     {perk.name}
                   </h3>
                   <p className="text-xs text-slate-300 leading-relaxed font-normal">

@@ -1333,3 +1333,157 @@ h1, h2, h3, h4, .font-heading {
     }
   }
 }
+
+/* =========================================================
+   PERKS / QUÀ TẶNG INTERACTIVE HOVER & ACTIVE (MOBILE-FRIENDLY)
+   ========================================================= */
+.perk-card {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.perk-card .perk-img {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.perk-card .perk-title {
+  transition: color 0.3s ease;
+}
+
+/* Desktop: Chỉ kích hoạt hover trên thiết bị dùng chuột thực thụ (tránh sticky hover trên mobile) */
+@media (hover: hover) and (pointer: fine) {
+  .perk-card-rose:hover {
+    border-color: rgba(244, 63, 94, 0.55);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 24px rgba(142, 32, 50, 0.35);
+  }
+  .perk-card-rose:hover .perk-img {
+    transform: scale(1.05) rotate(-2deg);
+  }
+  .perk-card-rose:hover .perk-title {
+    color: rgb(254, 205, 211);
+  }
+
+  .perk-card-purple:hover {
+    border-color: rgba(245, 158, 11, 0.55);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 24px rgba(69, 26, 3, 0.45);
+  }
+  .perk-card-purple:hover .perk-img {
+    transform: scale(1.05) rotate(2deg);
+  }
+  .perk-card-purple:hover .perk-title {
+    color: rgb(253, 230, 138);
+  }
+
+  .perk-card-cyan:hover {
+    border-color: rgba(251, 113, 133, 0.55);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 24px rgba(142, 32, 50, 0.35);
+  }
+  .perk-card-cyan:hover .perk-img {
+    transform: scale(1.05);
+  }
+  .perk-card-cyan:hover .perk-title {
+    color: rgb(255, 228, 230);
+  }
+
+  .perk-card-amber:hover {
+    border-color: rgba(245, 158, 11, 0.55);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 24px rgba(69, 26, 3, 0.45);
+  }
+  .perk-card-amber:hover .perk-img {
+    transform: scale(1.05);
+  }
+  .perk-card-amber:hover .perk-title {
+    color: rgb(253, 230, 138);
+  }
+}
+
+/* Mobile & Touch: Trạng thái Active khi người dùng chạm vào (nhấn lần nữa hoặc chỗ khác sẽ tắt) */
+.perk-card-rose.is-active {
+  border-color: rgba(244, 63, 94, 0.75) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 28px rgba(142, 32, 50, 0.5) !important;
+}
+.perk-card-rose.is-active .perk-img {
+  transform: scale(1.06) rotate(-2deg) !important;
+}
+.perk-card-rose.is-active .perk-title {
+  color: rgb(254, 205, 211) !important;
+}
+
+.perk-card-purple.is-active {
+  border-color: rgba(245, 158, 11, 0.75) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 28px rgba(69, 26, 3, 0.55) !important;
+}
+.perk-card-purple.is-active .perk-img {
+  transform: scale(1.06) rotate(2deg) !important;
+}
+.perk-card-purple.is-active .perk-title {
+  color: rgb(253, 230, 138) !important;
+}
+
+.perk-card-cyan.is-active {
+  border-color: rgba(251, 113, 133, 0.75) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 28px rgba(142, 32, 50, 0.5) !important;
+}
+.perk-card-cyan.is-active .perk-img {
+  transform: scale(1.06) !important;
+}
+.perk-card-cyan.is-active .perk-title {
+  color: rgb(255, 228, 230) !important;
+}
+
+.perk-card-amber.is-active {
+  border-color: rgba(245, 158, 11, 0.75) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 28px rgba(69, 26, 3, 0.55) !important;
+}
+.perk-card-amber.is-active .perk-img {
+  transform: scale(1.06) !important;
+}
+.perk-card-amber.is-active .perk-title {
+  color: rgb(253, 230, 138) !important;
+}
+
+/* =========================================================
+   SCROLL NAVIGATION BUTTON (DESKTOP HOVER & MOBILE TOUCH-ACTIVE)
+   ========================================================= */
+.scroll-nav-btn {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s ease,
+    color 0.25s ease,
+    box-shadow 0.25s ease,
+    opacity 0.3s ease;
+}
+
+.scroll-nav-btn:focus,
+.scroll-nav-btn:focus-visible {
+  outline: none;
+}
+
+/* Chỉ áp dụng hiệu ứng khi rê chuột trên máy tính */
+@media (hover: hover) and (pointer: fine) {
+  .scroll-nav-btn:hover {
+    border-color: rgba(251, 113, 133, 0.85);
+    color: #ffffff;
+    transform: scale(1.1);
+    box-shadow:
+      0 0 22px rgba(225, 29, 72, 0.45),
+      0 20px 25px -5px rgba(0, 0, 0, 0.8);
+  }
+}
+
+/* Trên mobile & lúc ấn chuột: kích hoạt tức thì phát sáng viền và phản hồi khi chạm */
+.scroll-nav-btn:active,
+.scroll-nav-btn.is-pressed {
+  border-color: rgba(251, 113, 133, 0.95) !important;
+  color: #ffffff !important;
+  transform: scale(0.94) !important;
+  box-shadow:
+    0 0 24px rgba(225, 29, 72, 0.6),
+    0 15px 20px -5px rgba(0, 0, 0, 0.8) !important;
+}
+
+

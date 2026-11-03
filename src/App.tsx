@@ -14,6 +14,7 @@ import ArtistCard from './components/Lineup/ArtistCard';
 import ArtistModal from './components/Lineup/ArtistModal';
 import Perks from './components/Perks/Perks';
 import Footer from './components/Footer/Footer';
+import ScrollNavButton from './components/Navigation/ScrollNavButton';
 import BookingPage from './pages/BookingPage';
 import { ARTISTS } from './data/artists';
 import { INITIAL_SEATS } from './data/seats';
@@ -478,6 +479,8 @@ export function App() {
         {renderToastIcon()}
         <span className="font-medium">{toast.message}</span>
       </div>
+      {/* NÚT ĐIỀU HƯỚNG CUỘN TRÒN NỔI GÓC DƯỚI BÊN PHẢI (SMART SCROLL NAV BUTTON) */}
+      <ScrollNavButton />
     </div>
   );
 }
