@@ -13,9 +13,10 @@ import { Artist } from '../../types';
 export interface ArtistModalProps {
   artist: Artist | null;
   onClose: () => void;
+  onOpenBooking?: () => void;
 }
 
-export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose }) => {
+export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpenBooking }) => {
   const [selectedSubId, setSelectedSubId] = useState<string>('all');
   const [contentTab, setContentTab] = useState<'slogan' | 'setlist'>('slogan');
 
@@ -27,6 +28,17 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose }) => 
         setSelectedSubId('all');
       }
       setContentTab('slogan');
+    }
+  }, [artist]);
+
+  // Khóa hoàn toàn tính năng cuộn trang chính khi modal mở (overflow: hidden cho body)
+  useEffect(() => {
+    if (artist) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
     }
   }, [artist]);
 
@@ -47,11 +59,11 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose }) => 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
       onClick={onClose}
     >
       <div
-        className="glass-wine w-full max-w-2xl rounded-3xl border border-white/20 shadow-2xl modal-enter overflow-hidden max-h-[92vh] flex flex-col"
+        className="bg-[#15070c]/95 w-full max-w-2xl rounded-3xl border border-white/20 shadow-2xl modal-enter overflow-hidden max-h-[92vh] flex flex-col"
         style={
           {
             boxShadow: `0 25px 80px -15px rgba(0,0,0,0.95), 0 0 40px ${artist.theme.glowSoft}`,
@@ -234,14 +246,17 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose }) => 
             </div>
 
             <div className="pt-4 mt-4 border-t border-white/10 flex items-center gap-3">
-              <a
-                href="#booking-section"
-                onClick={onClose}
-                className={`flex-1 py-3 px-5 rounded-xl bg-gradient-to-r ${artist.theme.ctaGradientClass} text-white text-xs font-bold text-center shadow-lg transition active:scale-95 flex items-center justify-center gap-2`}
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenBooking?.();
+                }}
+                className={`flex-1 py-3 px-5 rounded-xl bg-gradient-to-r ${artist.theme.ctaGradientClass} text-white text-xs font-bold text-center shadow-lg transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer`}
               >
                 <Ticket className="w-4 h-4" />
                 <span>{artist.ctaText}</span>
-              </a>
+              </button>
               <button
                 type="button"
                 onClick={onClose}

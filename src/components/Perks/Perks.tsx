@@ -13,11 +13,11 @@ export const Perks: React.FC<PerksProps> = ({ perks = PERKS }) => {
       case 'sparkles':
         return <Sparkles className="w-3.5 h-3.5" />;
       case 'tag':
-        return <Tag className="w-3.5 h-3.5 text-purple-400" />;
+        return <Tag className="w-3.5 h-3.5 text-amber-400" />;
       case 'ticket':
-        return <Ticket className="w-3.5 h-3.5" />;
+        return <Ticket className="w-3.5 h-3.5 text-rose-400" />;
       case 'coffee':
-        return <Coffee className="w-3.5 h-3.5" />;
+        return <Coffee className="w-3.5 h-3.5 text-amber-400" />;
     }
   };
 
@@ -34,39 +34,39 @@ export const Perks: React.FC<PerksProps> = ({ perks = PERKS }) => {
     }
   > = {
     rose: {
-      cardHover: 'hover:border-rose-500/40 hover:shadow-xl hover:shadow-rose-950/30',
-      frameGradient: 'from-rose-500/15 via-white/[0.03] to-black/60',
-      badgeClass: 'bg-rose-950/90 text-rose-300 border-rose-500/40',
+      cardHover: 'hover:border-rose-500/50 hover:shadow-xl hover:shadow-[#8E2032]/30',
+      frameGradient: 'from-rose-500/15 via-[#8E2032]/10 to-black/70',
+      badgeClass: 'bg-[#8E2032]/90 text-rose-200 border-rose-500/40',
       categoryClass: 'text-rose-400',
       titleHover: 'group-hover:text-rose-200',
-      footerClass: 'text-rose-300/80',
+      footerClass: 'text-rose-300/90',
       imgRotateHover: 'group-hover:scale-105 group-hover:-rotate-2',
     },
     purple: {
-      cardHover: 'hover:border-slate-300/40 hover:shadow-xl hover:shadow-purple-950/30',
-      frameGradient: 'from-purple-500/15 via-white/[0.03] to-black/60',
-      badgeClass: 'bg-black/90 text-slate-300 border-white/20',
-      categoryClass: 'text-slate-300',
-      titleHover: 'group-hover:text-purple-200',
-      footerClass: 'text-slate-400',
+      cardHover: 'hover:border-amber-500/50 hover:shadow-xl hover:shadow-amber-950/30',
+      frameGradient: 'from-amber-500/15 via-[#6B1724]/10 to-black/70',
+      badgeClass: 'bg-amber-950/90 text-amber-200 border-amber-500/40',
+      categoryClass: 'text-amber-400',
+      titleHover: 'group-hover:text-amber-200',
+      footerClass: 'text-amber-300/90',
       imgRotateHover: 'group-hover:scale-105 group-hover:rotate-2',
     },
     cyan: {
-      cardHover: 'hover:border-cyan-500/40 hover:shadow-xl hover:shadow-cyan-950/30',
-      frameGradient: 'from-cyan-500/15 via-white/[0.03] to-black/60',
-      badgeClass: 'bg-cyan-950/90 text-cyan-300 border-cyan-500/40',
-      categoryClass: 'text-cyan-400',
-      titleHover: 'group-hover:text-cyan-200',
-      footerClass: 'text-cyan-300/80',
+      cardHover: 'hover:border-rose-400/50 hover:shadow-xl hover:shadow-[#8E2032]/30',
+      frameGradient: 'from-[#8E2032]/25 via-white/[0.03] to-black/70',
+      badgeClass: 'bg-[#6B1724]/90 text-rose-200 border-rose-400/40',
+      categoryClass: 'text-rose-300',
+      titleHover: 'group-hover:text-rose-100',
+      footerClass: 'text-rose-300/90',
       imgRotateHover: 'group-hover:scale-105',
     },
     amber: {
-      cardHover: 'hover:border-amber-500/40 hover:shadow-xl hover:shadow-amber-950/30',
-      frameGradient: 'from-amber-500/15 via-white/[0.03] to-black/60',
+      cardHover: 'hover:border-amber-500/50 hover:shadow-xl hover:shadow-amber-950/30',
+      frameGradient: 'from-amber-500/20 via-[#8E2032]/10 to-black/70',
       badgeClass: 'bg-amber-950/90 text-amber-300 border-amber-500/40',
       categoryClass: 'text-amber-400',
       titleHover: 'group-hover:text-amber-200',
-      footerClass: 'text-amber-300/80',
+      footerClass: 'text-amber-300/90',
       imgRotateHover: 'group-hover:scale-105',
     },
   };

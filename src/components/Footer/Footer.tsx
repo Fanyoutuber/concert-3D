@@ -8,7 +8,11 @@ import {
   PhoneCall,
 } from 'lucide-react';
 
-export const Footer: React.FC = () => {
+export interface FooterProps {
+  onOpenBooking?: () => void;
+}
+
+export const Footer: React.FC<FooterProps> = ({ onOpenBooking }) => {
   return (
     <footer className="py-14 border-t border-white/10 bg-[#080406] text-slate-400 text-xs relative overflow-hidden">
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] h-48 bg-[#8E2032]/10 blur-[130px] rounded-full pointer-events-none" />
@@ -55,7 +59,7 @@ export const Footer: React.FC = () => {
               O.L.A – One Legacy, All
             </h5>
             <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-              Tổ chức bởi Ban Âm nhạc (M Music Club) phối hợp cùng cựu học sinh Trường THCS và THPT Trần Đại Nghĩa.
+              Tổ chức bởi CLB Văn nghệ Chuyên Trần Đại Nghĩa phối hợp cùng cựu học sinh Trường THCS và THPT Trần Đại Nghĩa.
             </p>
             <div className="flex flex-wrap gap-2 justify-center md:justify-start text-[10px]">
               <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20">
@@ -116,8 +120,17 @@ export const Footer: React.FC = () => {
                 Line-up
               </a>
               <span className="text-white/20">•</span>
-              <a href="#booking-section" className="hover:text-white transition">
-                Đặt vé
+              <a
+                href="#/dat-ve"
+                onClick={(e) => {
+                  if (onOpenBooking) {
+                    e.preventDefault();
+                    onOpenBooking();
+                  }
+                }}
+                className="hover:text-white transition"
+              >
+                Đặt vé &amp; Sơ đồ
               </a>
               <span className="text-white/20">•</span>
               <a href="#perks" className="hover:text-white transition">

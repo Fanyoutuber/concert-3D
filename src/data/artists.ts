@@ -5,10 +5,10 @@ export const ARTISTS: Artist[] = [
     id: 'artist-club',
     key: 'club',
     row: 1,
-    name: 'M Music Club',
+    name: 'CLB Văn nghệ Chuyên Trần Đại Nghĩa',
     subtitle: 'Ban Âm nhạc Trường THCS và THPT Trần Đại Nghĩa',
     roleBadge: 'HOST BAND • TĐN',
-    drawerHeaderBadge: 'M MUSIC CLUB • BAN ÂM NHẠC TRƯỜNG THCS & THPT TRẦN ĐẠI NGHĨA',
+    drawerHeaderBadge: 'CLB VĂN NGHỆ CHUYÊN TRẦN ĐẠI NGHĨA',
     cheerCount: 342,
     cutoutImage: 'assets/cutout-club.png',
     backdropImage: 'assets/artist-club.jpg',
@@ -23,7 +23,7 @@ export const ARTISTS: Artist[] = [
     style: 'Live Band & Dance',
     setlistHeaderBadge: '3 tiết mục mở màn',
     stageEffects: 'Hiệu ứng: LED sự kiện, spotlight, pháo giấy mở màn',
-    ctaText: 'Săn Vé Cùng M Music Club',
+    ctaText: 'Săn Vé Cùng CLB Văn Nghệ TĐN',
     songs: [
       {
         number: '01',

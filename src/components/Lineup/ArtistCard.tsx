@@ -19,6 +19,7 @@ export interface ArtistCardProps {
   onActivate: (key: Artist['key']) => void;
   onToggle: (key: Artist['key']) => void;
   onOpenModal?: (artist: Artist) => void;
+  onOpenBooking?: () => void;
 }
 
 export const ArtistCard: React.FC<ArtistCardProps> = ({
@@ -27,26 +28,44 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
   onActivate,
   onToggle,
   onOpenModal,
+  onOpenBooking,
 }) => {
   const [activeTab, setActiveTab] = useState<'slogan' | 'setlist'>('slogan');
   const [selectedSubArtistId, setSelectedSubArtistId] = useState<string>(
     artist.subArtists?.[0]?.id ?? 'all'
   );
-  const [tiltStyle, setTiltStyle] = useState<React.CSSProperties>({});
   const cardRef = useRef<HTMLElement | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLElement>) => {
     if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const rotateX = ((y - centerY) / centerY) * -4.5;
-    const rotateY = ((x - centerX) / centerX) * 4.5;
+    if (!window.matchMedia('(min-width: 1024px) and (hover: hover)').matches) return;
 
-    setTiltStyle({
-      transform: `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`,
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+    }
+
+    rafRef.current = requestAnimationFrame(() => {
+      if (!cardRef.current) return;
+      const rect = cardRef.current.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      const normX = Math.max(-1, Math.min(1, (x - centerX) / centerX));
+      const normY = Math.max(-1, Math.min(1, (y - centerY) / centerY));
+
+      const rotateX = normY * -3.5;
+      const rotateY = normX * 3.5;
+
+      cardRef.current.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg)`;
+      rafRef.current = null;
     });
   };
 
@@ -57,7 +76,13 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
   };
 
   const handleMouseLeave = () => {
-    setTiltStyle({});
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    if (cardRef.current) {
+      cardRef.current.style.transform = '';
+    }
   };
 
   const handleCardClick = (e: React.MouseEvent<HTMLElement>) => {
@@ -122,7 +147,6 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
           '--artist-glow-soft': artist.theme.glowSoft,
           '--border-glow': artist.theme.borderGlow,
           '--card-bg-tint': artist.theme.cardBgTint,
-          ...tiltStyle,
         } as React.CSSProperties
       }
     >
@@ -136,7 +160,8 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
               alt=""
               className={`w-full h-full object-cover ${
                 artist.backdropPosition ?? 'object-center'
-              } opacity-20 filter blur-[2px]`}
+              } opacity-20`}
+              loading="lazy"
               decoding="async"
             />
             <div className="stage-card-backdrop-overlay" />
@@ -223,7 +248,8 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="drawer-content-inner">
-            <div className="flex items-center justify-between gap-2 mb-2.5">
+            <div className="drawer-body-pad">
+              <div className="flex items-center justify-between gap-2 mb-2.5">
               <span
                 className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border flex items-center gap-1.5 ${artist.theme.drawerBadgeClass}`}
               >
@@ -381,12 +407,20 @@ export const ArtistCard: React.FC<ArtistCardProps> = ({
             )}
 
             <div className="pt-2.5 mt-auto border-t border-white/10 flex items-center gap-2">
-              <a
-                href="#booking-section"
-                className={`flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r ${artist.theme.ctaGradientClass} text-white text-xs font-bold text-center shadow-lg transition active:scale-95 flex items-center justify-center gap-1.5`}
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenBooking) {
+                    onOpenBooking();
+                  } else {
+                    window.location.hash = '#/dat-ve';
+                  }
+                }}
+                className={`flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r ${artist.theme.ctaGradientClass} text-white text-xs font-bold text-center shadow-lg transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer`}
               >
                 <Ticket className="w-4 h-4" /> {artist.ctaText}
-              </a>
+              </button>
+            </div>
             </div>
           </div>
         </div>

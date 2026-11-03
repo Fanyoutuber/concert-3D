@@ -1,0 +1,17 @@
+# Thư viện
+node_modules/
+
+# Thư mục build
+dist/
+
+# Bản sao lưu cá nhân
+google-apps-script-fixed.js/
+backup/
+
+# Bộ nhớ tạm của TypeScript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Tệp môi trường chứa mật khẩu/API key (nếu có sau này)
+.env
+.env.local

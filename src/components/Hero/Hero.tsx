@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ArrowDown,
   ArrowUpRight,
   Clock,
   Info,
@@ -13,7 +12,11 @@ import {
   Zap,
 } from 'lucide-react';
 
-export const Hero: React.FC = () => {
+export interface HeroProps {
+  onOpenBooking?: () => void;
+}
+
+export const Hero: React.FC<HeroProps> = ({ onOpenBooking }) => {
   return (
     <>
       {/* HERO SECTION & BANNER TICKET SHOWCASE */}
@@ -61,13 +64,14 @@ export const Hero: React.FC = () => {
               <span className="text-xl md:text-2xl font-black font-mono text-amber-300">250,000 VND</span>
             </div>
 
-            <a
-              href="#booking-section"
-              className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-gradient-to-r from-[#8E2032] via-[#A8243A] to-[#C9334C] hover:from-[#A8243A] hover:to-[#DE3D58] font-bold text-white text-base shadow-xl shadow-[#8E2032]/40 transition transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+            <button
+              type="button"
+              onClick={onOpenBooking}
+              className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-gradient-to-r from-[#8E2032] via-[#A8243A] to-[#C9334C] hover:from-[#A8243A] hover:to-[#DE3D58] font-bold text-white text-base shadow-xl shadow-[#8E2032]/40 transition transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
             >
               <Ticket className="w-5 h-5 text-amber-300" />
               <span>Đặt mua vé ngay</span>
-            </a>
+            </button>
           </div>
 
           {/* Real Ticket Banner Embed */}
@@ -249,13 +253,14 @@ export const Hero: React.FC = () => {
                   2 Cách Đăng Ký &amp; Nhận Vé Concert
                 </h3>
               </div>
-              <a
-                href="#booking-section"
-                className="px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition flex items-center justify-center gap-2 self-center md:self-auto"
+              <button
+                type="button"
+                onClick={onOpenBooking}
+                className="px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition flex items-center justify-center gap-2 self-center md:self-auto cursor-pointer"
               >
-                <span>Đến sơ đồ chọn chỗ</span>
-                <ArrowDown className="w-3.5 h-3.5 text-amber-300" />
-              </a>
+                <span>Mở cửa sổ đặt vé &amp; chọn chỗ</span>
+                <ArrowUpRight className="w-3.5 h-3.5 text-amber-300" />
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

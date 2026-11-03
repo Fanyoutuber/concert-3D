@@ -1,11 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import {
+  AlertCircle,
+  ArrowLeft,
   ArrowRight,
   Bookmark,
   Check,
+  CheckCheck,
   Clock,
+  Copy,
+  Download,
+  Loader2,
+  Mail,
+  Phone,
   Plus,
+  RefreshCw,
   Share2,
+  User,
   X,
 } from 'lucide-react';
 import { Seat, TicketTier } from '../../types';
@@ -15,6 +25,12 @@ declare global {
     confetti?: (options: Record<string, unknown>) => void;
   }
 }
+
+const GOOGLE_APPS_SCRIPT_URL =
+  'https://script.google.com/macros/s/AKfycbzYua8lfCimH4-8NH3rTMjdEzIVnIad05n8CgJzvhhCpzdzPbsggssC78a1VOe9rFy4/exec';
+
+// Khóa bảo vệ giao tiếp API (Layer 1 Security Handshake)
+const API_SECRET_TOKEN = 'TDN_CONCERT_SECURE_2026_X9#1';
 
 export interface TicketSummaryProps {
   selectedSeats: Seat[];
@@ -52,6 +68,25 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
   const [confirmedTotal, setConfirmedTotal] = useState(0);
   const [qrFallback, setQrFallback] = useState(false);
 
+  // Thông tin khách hàng đặt vé & gửi email
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [honeypot, setHoneypot] = useState(''); // Bẫy bot ngầm (chống spam tự động)
+  const [confirmedCustomerName, setConfirmedCustomerName] = useState('');
+  const [confirmedCustomerEmail, setConfirmedCustomerEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Tiện ích Phương án 2 & 3: Gửi lại vé & Lưu vé về máy
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [isResending, setIsResending] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  // Quản lý quy trình 2 bước chuẩn Ticketbox (Bước 1: Điền thông tin -> Bước 2: Quét mã QR)
+  const [checkoutStep, setCheckoutStep] = useState<'info' | 'payment'>('info');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
   const count = selectedSeats.length;
   const totalAmount = selectedSeats.reduce((sum, s) => sum + s.price, 0);
 
@@ -83,29 +118,397 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
     const newCode = 'TDN' + Math.floor(100000 + Math.random() * 900000);
     setOrderCode(newCode);
     setQrFallback(false);
+    setFormError(null);
+    setCheckoutStep('info'); // Luôn bắt đầu từ Bước 1
     setIsCheckoutOpen(true);
   };
 
-  const handleSimulatePaymentSuccess = () => {
+  // Bộ đếm ngược cooldown gửi lại vé (Phương án 2)
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const handleProceedToPayment = () => {
+    const trimmedName = customerName.trim();
+    const trimmedEmail = customerEmail.trim();
+
+    if (!trimmedName) {
+      setFormError('Vui lòng nhập Họ và tên của bạn để xuất vé.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+      setFormError('Vui lòng nhập địa chỉ Email hợp lệ để nhận vé điện tử.');
+      return;
+    }
+
+    // KIỂM TRA COOLDOWN 60S NGAY TẠI BƯỚC 1 (Chặn trước khi thanh toán)
+    const storageKey = `tdn_cooldown_${trimmedEmail.toLowerCase()}`;
+    const lastSentTime = localStorage.getItem(storageKey);
+    const now = Date.now();
+    const COOLDOWN_MS = 60 * 1000;
+
+    if (lastSentTime && now - Number(lastSentTime) < COOLDOWN_MS) {
+      const remainingSec = Math.ceil((COOLDOWN_MS - (now - Number(lastSentTime))) / 1000);
+      setFormError(
+        `Email này vừa hoàn tất đặt vé cách đây ít phút. Vui lòng kiểm tra hộp thư (cả mục Spam) trước, hoặc đợi ${remainingSec}s để tiếp tục đặt vé mới.`
+      );
+      return;
+    }
+
+    setFormError(null);
+    setCheckoutStep('payment');
+  };
+
+  const handleCopyText = (key: string, text: string, label: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      onNotify?.(`Đã sao chép ${label}! 📋`, 'emerald');
+      setTimeout(() => setCopiedKey(null), 2000);
+    }
+  };
+
+  const handleConfirmAndSendTicket = async () => {
+    // 1. Kiểm tra validation form
+    const trimmedName = customerName.trim();
+    const trimmedEmail = customerEmail.trim();
+    const trimmedPhone = customerPhone.trim();
+
+    if (!trimmedName) {
+      setFormError('Vui lòng nhập Họ và tên của bạn để xuất vé.');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+      setFormError('Vui lòng nhập địa chỉ Email hợp lệ để nhận vé điện tử.');
+      return;
+    }
+
+    setFormError(null);
+
+    // 0. Kiểm tra Cooldown 60s theo email trên trình duyệt (tránh bấm liên tiếp)
+    const storageKey = `tdn_cooldown_${trimmedEmail.toLowerCase()}`;
+    const lastSentTime = localStorage.getItem(storageKey);
+    const now = Date.now();
+    const COOLDOWN_MS = 60 * 1000;
+
     const labels = selectedSeats.map((s) => s.label);
     const paidTotal = totalAmount;
 
-    setIsCheckoutOpen(false);
-    setConfirmedSeatLabels(labels);
-    setConfirmedTotal(paidTotal);
-    setIsTicketOpen(true);
-
-    if (typeof window.confetti === 'function') {
-      window.confetti({
-        particleCount: 140,
-        spread: 90,
-        origin: { y: 0.6 },
-        colors: ['#A855F7', '#EC4899', '#E11D48', '#F59E0B', '#10B981', '#FAF5F0'],
-      });
+    if (lastSentTime && now - Number(lastSentTime) < COOLDOWN_MS) {
+      const remainingSec = Math.ceil((COOLDOWN_MS - (now - Number(lastSentTime))) / 1000);
+      onNotify?.(
+        `Email ${trimmedEmail} vừa nhận vé cách đây ít phút. Vui lòng kiểm tra hòm thư (hoặc đợi ${remainingSec}s).`,
+        'amber'
+      );
+      // Hiển thị vé trực tiếp trên màn hình mà không cần gửi lại request spam mail
+      setIsCheckoutOpen(false);
+      setConfirmedCustomerName(trimmedName);
+      setConfirmedCustomerEmail(trimmedEmail);
+      setConfirmedSeatLabels(labels);
+      setConfirmedTotal(paidTotal);
+      setIsTicketOpen(true);
+      return;
     }
 
-    onConfirmBooking(orderCode);
-    onNotify?.('Xác nhận thành công! Vé E-Ticket của bạn đã sẵn sàng.', 'purple');
+    setIsSubmitting(true);
+
+    // 2. Gửi dữ liệu sang Google Apps Script (Bảo vệ Lớp 1)
+    try {
+      const payload = {
+        secretToken: API_SECRET_TOKEN,
+        hp_website: honeypot, // Bẫy bot
+        orderCode,
+        customerName: trimmedName,
+        customerEmail: trimmedEmail,
+        customerPhone: trimmedPhone || 'Không cung cấp',
+        seats: labels.map((l) => `Khu ${l}`),
+        seatCount: labels.length,
+        totalAmount: paidTotal,
+        note: 'Đã xác nhận chuyển khoản VietQR MBBank',
+      };
+
+      await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      // Lưu mốc thời gian cooldown 5 phút
+      localStorage.setItem(storageKey, Date.now().toString());
+
+      onNotify?.(
+        `Thành công! Vé điện tử đã được gửi tới email ${trimmedEmail}`,
+        'emerald'
+      );
+    } catch (err) {
+      console.error('Lỗi khi gửi dữ liệu sang Google Apps Script:', err);
+      onNotify?.(
+        'Đã ghi nhận đơn vé! Đang đồng bộ với hệ thống...',
+        'amber'
+      );
+    } finally {
+      setIsSubmitting(false);
+      setIsCheckoutOpen(false);
+      setConfirmedCustomerName(trimmedName);
+      setConfirmedCustomerEmail(trimmedEmail);
+      setConfirmedSeatLabels(labels);
+      setConfirmedTotal(paidTotal);
+      setIsTicketOpen(true);
+
+      if (typeof window.confetti === 'function') {
+        window.confetti({
+          particleCount: 140,
+          spread: 90,
+          origin: { y: 0.6 },
+          colors: ['#A855F7', '#EC4899', '#E11D48', '#F59E0B', '#10B981', '#FAF5F0'],
+        });
+      }
+
+      onConfirmBooking(orderCode);
+    }
+  };
+
+  // Phương án 2: Yêu cầu gửi lại vé về email (Resend Ticket)
+  const handleResendTicketEmail = async () => {
+    if (resendCooldown > 0 || isResending) return;
+    setIsResending(true);
+
+    const emailToSend = confirmedCustomerEmail || customerEmail;
+    const nameToSend = confirmedCustomerName || customerName;
+
+    try {
+      const payload = {
+        secretToken: API_SECRET_TOKEN,
+        hp_website: '',
+        orderCode,
+        customerName: nameToSend,
+        customerEmail: emailToSend,
+        customerPhone: customerPhone || 'Không cung cấp',
+        seats: confirmedSeatLabels.map((l) => (l.startsWith('Khu') ? l : `Khu ${l}`)),
+        seatCount: confirmedSeatLabels.length,
+        totalAmount: confirmedTotal || totalAmount,
+        note: 'Yêu cầu gửi lại vé từ khán giả',
+      };
+
+      await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      onNotify?.(
+        `Đã gửi lại vé tới email ${emailToSend}! Vui lòng kiểm tra hộp thư.`,
+        'emerald'
+      );
+      setResendCooldown(60);
+    } catch (err) {
+      console.error('Lỗi khi gửi lại vé:', err);
+      onNotify?.('Đã tiếp nhận yêu cầu gửi lại vé!', 'amber');
+      setResendCooldown(60);
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  // Phương án 3: Lưu vé về máy / Tải ảnh vé PNG (Save Ticket to Device)
+  const handleDownloadTicket = async () => {
+    setIsDownloading(true);
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 600;
+      canvas.height = 920;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas không được hỗ trợ');
+
+      // 1. Nền Crimson Wine
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      bgGrad.addColorStop(0, '#2D0A14');
+      bgGrad.addColorStop(0.5, '#16070B');
+      bgGrad.addColorStop(1, '#0C0306');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Viền thẻ
+      ctx.strokeStyle = '#5A1622';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+      ctx.strokeStyle = '#D4AF37';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(18, 18, canvas.width - 36, canvas.height - 36);
+
+      // Badge
+      ctx.fillStyle = 'rgba(107, 23, 36, 0.85)';
+      ctx.fillRect(160, 42, 280, 30);
+      ctx.strokeStyle = '#D4AF37';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(160, 42, 280, 30);
+
+      ctx.fillStyle = '#FAF5F0';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('◆ VÉ ĐIỆN TỬ CHÍNH THỨC ◆', 300, 62);
+
+      // Tiêu đề
+      ctx.fillStyle = '#F43F5E';
+      ctx.font = '900 28px sans-serif';
+      ctx.fillText('ALO! TĐN XIN NGHE', 300, 115);
+
+      ctx.fillStyle = '#CBD5E1';
+      ctx.font = '13px sans-serif';
+      ctx.fillText('Ban Âm nhạc THCS & THPT Trần Đại Nghĩa • O.L.A', 300, 145);
+
+      // Khung Mã Đơn
+      ctx.fillStyle = '#20080E';
+      ctx.fillRect(40, 175, 520, 75);
+      ctx.strokeStyle = '#5A1622';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(40, 175, 520, 75);
+
+      ctx.fillStyle = '#D4AF37';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('MÃ ĐƠN ĐẶT VÉ', 60, 202);
+
+      ctx.fillStyle = '#FBBF24';
+      ctx.font = '900 24px monospace';
+      ctx.fillText(`#${orderCode}`, 60, 235);
+
+      ctx.fillStyle = '#10B981';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('✓ ĐÃ XÁC NHẬN', 530, 220);
+
+      // Thông tin khán giả
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('Khán giả:', 60, 280);
+      ctx.fillStyle = '#FAF5F0';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(confirmedCustomerName || customerName || 'Khán giả TĐN', 130, 280);
+
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '12px sans-serif';
+      ctx.fillText('Email:', 60, 305);
+      ctx.fillStyle = '#FBBF24';
+      ctx.font = 'bold 13px monospace';
+      ctx.fillText(confirmedCustomerEmail || customerEmail || 'Chưa cung cấp', 130, 305);
+
+      // 3 Khung thông số
+      ctx.fillStyle = 'rgba(107, 23, 36, 0.4)';
+      ctx.fillRect(40, 330, 160, 60);
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.3)';
+      ctx.strokeRect(40, 330, 160, 60);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#D4AF37';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('NGÀY DIỄN', 120, 352);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('07.06.2026', 120, 375);
+
+      ctx.fillStyle = 'rgba(107, 23, 36, 0.4)';
+      ctx.fillRect(220, 330, 160, 60);
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.3)';
+      ctx.strokeRect(220, 330, 160, 60);
+      ctx.fillStyle = '#D4AF37';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('THỜI GIAN', 300, 352);
+      ctx.fillStyle = '#FBBF24';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('17:00 – 21:30', 300, 375);
+
+      ctx.fillStyle = 'rgba(107, 23, 36, 0.4)';
+      ctx.fillRect(400, 330, 160, 60);
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.3)';
+      ctx.strokeRect(400, 330, 160, 60);
+      ctx.fillStyle = '#D4AF37';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('CỔNG VÀO', 480, 352);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('Cổng 20 LTTr', 480, 375);
+
+      // Địa điểm
+      ctx.fillStyle = 'rgba(107, 23, 36, 0.3)';
+      ctx.fillRect(40, 405, 520, 48);
+      ctx.strokeStyle = 'rgba(212, 175, 55, 0.25)';
+      ctx.strokeRect(40, 405, 520, 48);
+      ctx.fillStyle = '#D4AF37';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('ĐỊA ĐIỂM: Sân trường THCS & THPT Trần Đại Nghĩa (20 Lý Tự Trọng, Q.1)', 55, 434);
+
+      // Vị trí ghế
+      ctx.fillStyle = '#20080E';
+      ctx.fillRect(40, 468, 520, 70);
+      ctx.strokeStyle = '#5A1622';
+      ctx.strokeRect(40, 468, 520, 70);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#D4AF37';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText('VỊ TRÍ GHẾ NGỒI ĐÃ ĐẶT', 300, 492);
+      ctx.fillStyle = '#34D399';
+      ctx.font = '900 22px monospace';
+      ctx.fillText(confirmedSeatLabels.join(', ') || 'Khu CAT 17', 300, 522);
+
+      // Mã QR
+      const qrImg = new Image();
+      qrImg.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        qrImg.onload = resolve;
+        qrImg.onerror = reject;
+        qrImg.src = ticketQrUrl;
+      });
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(185, 555, 230, 230);
+      ctx.drawImage(qrImg, 195, 565, 210, 210);
+
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Xuất trình mã QR này tại cổng check-in (20 Lý Tự Trọng) để nhận Perks.', 300, 825);
+      ctx.fillStyle = '#64748B';
+      ctx.font = '10px sans-serif';
+      ctx.fillText('© 2026 O.L.A • Ban Âm nhạc THCS & THPT Trần Đại Nghĩa', 300, 860);
+
+      // Tải ảnh về máy
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `Ve-Dien-Tu-ALO-TDN-${orderCode}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      onNotify?.('Đã lưu ảnh vé điện tử về máy thành công! 🎟️', 'emerald');
+    } catch (err) {
+      console.warn('Fallback tải ảnh QR trực tiếp:', err);
+      const link = document.createElement('a');
+      link.download = `Ve-QR-TDN-${orderCode}.png`;
+      link.href = ticketQrUrl;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      onNotify?.('Đã mở ảnh mã QR vé để bạn lưu vào máy! 🎟️', 'emerald');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const bankId = 'MB';
@@ -129,7 +532,7 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
       {/* Tier Selector Cards */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-6 w-full max-w-xl">
         {/* Standard Tier Card */}
-        <div className="glass-card rounded-2xl p-4 border-2 border-purple-500/60 bg-purple-950/20 shadow-lg shadow-purple-900/20 flex flex-col justify-between">
+        <div className="glass-card rounded-2xl p-4 border-2 border-rose-500/50 bg-[#8E2032]/20 shadow-lg shadow-[#8E2032]/25 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold text-white uppercase">
@@ -151,7 +554,7 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
             id="btn-quick-select-std"
             type="button"
             onClick={onQuickSelectStandard}
-            className="mt-3 w-full py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow transition flex items-center justify-center gap-1.5 active:scale-95"
+            className="mt-3 w-full py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-[#8E2032] via-[#A8243A] to-[#B52A40] hover:from-[#A8243A] hover:to-[#C9334C] text-white shadow-md shadow-[#8E2032]/40 transition flex items-center justify-center gap-1.5 active:scale-95"
           >
             <Plus className="w-3.5 h-3.5" />{' '}
             {standardTier?.ctaLabel ?? 'Chọn nhanh 1 vé'}
@@ -189,10 +592,10 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
       {/* Selected Seat Summary Pill & Live Countdown */}
       <div
         id="selection-pill-bar"
-        className="w-full max-w-xl mt-6 p-4 rounded-2xl bg-gradient-to-r from-purple-950/40 via-indigo-950/30 to-purple-950/40 border border-purple-500/30 flex items-center justify-between gap-3 flex-wrap"
+        className="w-full max-w-xl mt-6 p-4 rounded-2xl bg-gradient-to-r from-rose-950/40 via-black/40 to-[#8E2032]/25 border border-rose-500/30 flex items-center justify-between gap-3 flex-wrap"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/30 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center justify-center shrink-0">
             <Bookmark className="w-5 h-5" />
           </div>
           <div>
@@ -214,7 +617,7 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
                   id="selected-seats-label"
                   className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap"
                 >
-                  <span className="text-purple-300 font-extrabold">
+                  <span className="text-rose-300 font-extrabold">
                     {count}/{maxSeats} vé
                   </span>
                   <span>•</span>
@@ -256,105 +659,346 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
           type="button"
           disabled={count === 0}
           onClick={handleOpenCheckout}
-          className="py-3.5 px-6 sm:px-8 rounded-full font-bold text-sm tracking-wide transition-all duration-200 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-purple-600 via-indigo-600 to-rose-600 hover:from-purple-500 hover:to-rose-500 text-white shadow-xl shadow-purple-900/40 active:scale-[0.98]"
+          className="py-3.5 px-6 sm:px-8 rounded-full font-bold text-sm tracking-wide transition-all duration-200 flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed bg-gradient-to-r from-[#8E2032] via-[#A8243A] to-[#D93853] hover:from-[#A8243A] hover:to-[#E54865] text-white shadow-xl shadow-[#8E2032]/40 active:scale-[0.98]"
         >
           <span>Xác nhận đặt vé</span>
           <ArrowRight className="w-4 h-4" />
         </button>
       </div>
 
-      {/* MODAL THANH TOÁN QR VIETQR */}
+      {/* MODAL THANH TOÁN 2 BƯỚC CHUẨN TICKETBOX (KHÔNG CUỘN, KHÔNG GIẬT LÊN XUỐNG) */}
       {isCheckoutOpen && (
         <div
           id="modal-checkout"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl"
-          onClick={() => setIsCheckoutOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-xl"
+          onClick={() => !isSubmitting && setIsCheckoutOpen(false)}
         >
-          <div
-            className="glass-wine w-full max-w-md rounded-3xl p-6 border border-white/20 shadow-2xl modal-enter max-h-[92vh] overflow-y-auto custom-scrollbar"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div>
-                <h3 className="text-base font-bold text-white font-heading">
-                  Thanh toán vé Concert
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Quét mã QR qua Ngân hàng hoặc Ví MoMo
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCheckoutOpen(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="mt-4 flex flex-col items-center">
-              <div className="w-full bg-white/5 border border-white/10 p-3 rounded-2xl flex items-center justify-between text-xs mb-3">
+          {checkoutStep === 'info' ? (
+            /* =========================================================
+               BƯỚC 1: ĐIỀN THÔNG TIN NHẬN VÉ (GỌN GÀNG, VỪA KHÍT MÀN HÌNH)
+               ========================================================= */
+            <div
+              className="glass-wine w-full max-w-md rounded-3xl p-5 sm:p-6 border border-white/20 shadow-2xl modal-enter relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header Bước 1 */}
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
                 <div>
-                  <span className="text-slate-400 block text-[10px] uppercase">Mã đơn vé</span>
-                  <span className="font-mono font-bold text-white">#{orderCode}</span>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      Bước 1 / 2
+                    </span>
+                    <span className="text-[10px] text-slate-400">Thông tin người mua</span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-white font-heading">
+                    Thông tin nhận vé Concert
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => setIsCheckoutOpen(false)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Tóm tắt nhanh đơn vé */}
+              <div className="mt-4 bg-white/5 border border-white/10 p-3 rounded-2xl flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase">Vị trí ghế ({count} vé)</span>
+                  <span className="font-mono font-bold text-emerald-400">
+                    {selectedSeats.map((s) => s.label).join(', ')}
+                  </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-slate-400 block text-[10px] uppercase">Số tiền</span>
+                  <span className="text-slate-400 block text-[10px] uppercase">Tổng thanh toán</span>
                   <span className="font-mono font-bold text-amber-300 text-sm">
                     {formatVND(totalAmount)}
                   </span>
                 </div>
               </div>
 
-              <div className="relative p-3 bg-white rounded-2xl shadow-2xl my-2">
-                <img
-                  src={qrFallback ? fallbackQrUrl : vietQrUrl}
-                  onError={() => setQrFallback(true)}
-                  alt="Mã QR thanh toán concert"
-                  className="w-52 h-52 object-contain rounded-xl"
+              {/* Form nhập thông tin */}
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label className="text-[11px] text-slate-300 block mb-1 font-medium">
+                    Họ và tên người nhận vé <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <User className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      autoFocus
+                      value={customerName}
+                      onChange={(e) => {
+                        setCustomerName(e.target.value);
+                        if (formError) setFormError(null);
+                      }}
+                      placeholder="Ví dụ: Trần Minh Khang"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-black/40 border border-white/15 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-400 transition"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] text-slate-300 block mb-1 font-medium">
+                    Email nhận vé E-Ticket <span className="text-rose-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => {
+                        setCustomerEmail(e.target.value);
+                        if (formError) setFormError(null);
+                      }}
+                      placeholder="email@example.com"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-black/40 border border-white/15 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-400 transition"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Mã QR và thông tin vé sẽ gửi tự động về hòm thư này.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-[11px] text-slate-300 block mb-1 font-medium">
+                    Số điện thoại liên hệ
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="tel"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      placeholder="Ví dụ: 0901 234 567 (tuỳ chọn)"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-black/40 border border-white/15 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-400 transition"
+                    />
+                  </div>
+                </div>
+
+                {/* Bẫy Honeypot ẩn (chỉ bot mới điền vào trường này) */}
+                <input
+                  type="text"
+                  name="hp_website"
+                  value={honeypot}
+                  onChange={(e) => setHoneypot(e.target.value)}
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  style={{
+                    display: 'none',
+                    position: 'absolute',
+                    left: '-9999px',
+                    opacity: 0,
+                    height: 0,
+                    width: 0,
+                    pointerEvents: 'none',
+                  }}
                 />
-              </div>
 
-              <div className="flex items-center gap-2 text-xs text-slate-300 mt-2 mb-2">
-                <Clock className="w-3.5 h-3.5 text-rose-400" />
-                <span>Hiệu lực thanh toán:</span>
-                <span className="font-mono font-bold text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded-full">
-                  {formatTimer(checkoutSeconds)}
-                </span>
-              </div>
+                {formError && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{formError}</span>
+                  </div>
+                )}
 
-              <div className="w-full bg-white/5 p-3 rounded-2xl text-[11px] text-slate-300 space-y-1.5 border border-white/5">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Ngân hàng:</span>
-                  <span className="font-semibold text-white">MB Bank (Quân Đội)</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Số tài khoản:</span>
-                  <span className="font-mono font-bold text-white">8888 6666 9999</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-400">Nội dung CK:</span>
-                  <span className="font-mono font-bold text-amber-300">
-                    {orderCode} XIN NGHE
-                  </span>
-                </div>
-              </div>
-
-              <div className="w-full mt-4 space-y-2">
                 <button
                   type="button"
-                  onClick={handleSimulatePaymentSuccess}
-                  className="w-full py-3.5 rounded-full font-bold text-white text-sm bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-xl flex items-center justify-center gap-2 transition active:scale-[0.98]"
+                  onClick={handleProceedToPayment}
+                  className="w-full mt-2 py-3.5 rounded-full font-bold text-white text-sm bg-gradient-to-r from-[#8E2032] via-[#A8243A] to-[#D93853] hover:from-[#A8243A] hover:to-[#E54865] shadow-xl shadow-[#8E2032]/40 flex items-center justify-center gap-2 transition active:scale-[0.98]"
                 >
-                  <Check className="w-4 h-4" />
-                  <span>Tôi đã chuyển khoản thành công</span>
+                  <span>Tiếp tục đến bước thanh toán QR</span>
+                  <ArrowRight className="w-4 h-4" />
                 </button>
-                <p className="text-[10px] text-center text-slate-400 font-normal">
-                  Hệ thống kích hoạt E-Ticket ngay tại chỗ không cần tải lại trang
-                </p>
               </div>
             </div>
-          </div>
+          ) : (
+            /* =========================================================
+               BƯỚC 2: QUÉT MÃ VIETQR (BỐ CỤC 2 CỘT CHUẨN PAYOS / VIETQR)
+               Không cuộn, cố định 100%, có nút Copy 1 chạm tiện lợi
+               ========================================================= */
+            <div
+              className="glass-wine w-full max-w-2xl rounded-3xl p-5 sm:p-6 border border-white/20 shadow-2xl modal-enter relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header Bước 2 */}
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={() => setCheckoutStep('info')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-xs text-slate-200 transition font-medium"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Sửa thông tin</span>
+                  </button>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                    Bước 2 / 2
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => setIsCheckoutOpen(false)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition disabled:opacity-50"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Thông báo nơi nhận vé */}
+              <div className="mt-3 py-2 px-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  <span className="text-slate-300 text-[11px]">
+                    Gửi vé đến: <strong className="text-white">{customerEmail}</strong> ({customerName})
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-rose-300 font-mono font-bold">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>{formatTimer(checkoutSeconds)}</span>
+                </div>
+              </div>
+
+              {/* Bố cục 2 cột (Cột Trái: Mã QR • Cột Phải: Thông tin CK) */}
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-12 gap-5 items-center">
+                {/* Cột trái: Mã QR VietQR */}
+                <div className="sm:col-span-5 flex flex-col items-center justify-center">
+                  <div className="p-2.5 bg-white rounded-2xl shadow-xl flex items-center justify-center">
+                    <img
+                      src={qrFallback ? fallbackQrUrl : vietQrUrl}
+                      onError={() => setQrFallback(true)}
+                      alt="Mã QR thanh toán concert"
+                      className="w-44 h-44 sm:w-48 sm:h-48 object-contain rounded-xl"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-2 text-center">
+                    Quét qua mọi App Ngân hàng hoặc MoMo
+                  </span>
+                </div>
+
+                {/* Cột phải: Thông tin tài khoản có nút Copy 1 chạm */}
+                <div className="sm:col-span-7 space-y-2 text-xs">
+                  {/* Ngân hàng */}
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase">Ngân hàng thụ hưởng</span>
+                      <span className="font-semibold text-white text-xs">MB Bank (Quân Đội)</span>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
+                      VietQR 24/7
+                    </span>
+                  </div>
+
+                  {/* Số tài khoản */}
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase">Số tài khoản</span>
+                      <span className="font-mono font-bold text-white text-sm">8888 6666 9999</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('accountNo', accountNo, 'Số tài khoản')}
+                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] text-rose-300 font-semibold flex items-center gap-1 transition active:scale-95"
+                    >
+                      {copiedKey === 'accountNo' ? (
+                        <>
+                          <CheckCheck className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-400">Đã chép</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Sao chép</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Số tiền */}
+                  <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block uppercase">Số tiền</span>
+                      <span className="font-mono font-black text-amber-300 text-sm">
+                        {formatVND(totalAmount)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('amount', totalAmount.toString(), 'Số tiền')}
+                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] text-rose-300 font-semibold flex items-center gap-1 transition active:scale-95"
+                    >
+                      {copiedKey === 'amount' ? (
+                        <>
+                          <CheckCheck className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-400">Đã chép</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Sao chép</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Nội dung chuyển khoản */}
+                  <div className="p-2.5 rounded-xl bg-rose-950/30 border border-rose-500/30 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-rose-300 block uppercase font-bold">Nội dung chuyển khoản</span>
+                      <span className="font-mono font-bold text-amber-300 text-xs">
+                        {orderCode} XIN NGHE
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyText('content', `${orderCode} XIN NGHE`, 'Nội dung chuyển khoản')}
+                      className="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-[10px] text-rose-200 font-bold flex items-center gap-1 transition active:scale-95"
+                    >
+                      {copiedKey === 'content' ? (
+                        <>
+                          <CheckCheck className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-400">Đã chép</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Sao chép</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Nút bấm xác nhận */}
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleConfirmAndSendTicket}
+                    className="w-full mt-3 py-3.5 rounded-full font-bold text-white text-sm bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-xl shadow-emerald-950/40 flex items-center justify-center gap-2 transition active:scale-[0.98] disabled:opacity-60 disabled:cursor-wait"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Đang lưu đơn &amp; gửi vé về email...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Tôi đã chuyển khoản thành công</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -367,8 +1011,8 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
         >
           <div className="w-full max-w-sm modal-enter" onClick={(e) => e.stopPropagation()}>
             <div className="relative rounded-[32px] overflow-hidden border border-white/20 bg-[#12080D] shadow-[0_25px_80px_rgba(0,0,0,0.95)]">
-              <div className="p-6 text-center bg-gradient-to-b from-purple-950/60 to-transparent">
-                <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-purple-600/40 mb-3">
+              <div className="p-6 text-center bg-gradient-to-b from-[#8E2032]/70 via-[#6B1724]/40 to-transparent">
+                <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-[#8E2032] to-rose-500 text-white flex items-center justify-center shadow-lg shadow-[#8E2032]/50 mb-3">
                   <Check className="w-7 h-7 stroke-[3]" />
                 </div>
                 <h3 className="text-2xl font-black font-heading text-white tracking-tight">
@@ -376,8 +1020,24 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
                 </h3>
                 <p className="text-xs text-slate-300 mt-0.5">
                   Vé concert đã sẵn sàng •{' '}
-                  <span className="font-mono text-purple-300 font-bold">#{orderCode}</span>
+                  <span className="font-mono text-amber-300 font-bold">#{orderCode}</span>
                 </p>
+                {confirmedCustomerEmail && (
+                  <div className="mt-3 p-2.5 rounded-xl bg-rose-950/50 border border-rose-500/30 text-left flex items-center gap-2.5">
+                    <Mail className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div className="text-[11px] overflow-hidden">
+                      <span className="text-slate-300 block">Đã gửi vé điện tử đến email:</span>
+                      <span className="font-mono font-bold text-amber-300 truncate block">
+                        {confirmedCustomerEmail}
+                      </span>
+                      {confirmedCustomerName && (
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          Khán giả: <strong className="text-white">{confirmedCustomerName}</strong>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="px-5 pb-5">
@@ -388,7 +1048,7 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
                   >
                     <div className="absolute inset-0 bg-gradient-to-t from-[#12080D] via-black/40 to-black/20" />
                     <div className="absolute bottom-2 left-3 right-3 text-left">
-                      <span className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-purple-600/80 text-white">
+                      <span className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase bg-[#8E2032] text-white">
                         LIVE MUSIC CONCERT
                       </span>
                       <h4 className="text-base font-black font-heading text-white leading-tight mt-1">
@@ -401,18 +1061,18 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
                   </div>
 
                   <div className="p-4 space-y-3 text-left">
-                    <div className="grid grid-cols-3 gap-2 pb-3 border-b border-white/10">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Ngày</span>
-                        <span className="text-xs font-bold text-white">07.06.26</span>
+                    <div className="grid grid-cols-3 gap-2 pb-3 border-b border-white/10 text-[11px]">
+                      <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-center">
+                        <span className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider block">Ngày diễn</span>
+                        <span className="text-xs font-bold text-white block mt-0.5">07.06.26</span>
                       </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Giờ diễn</span>
-                        <span className="text-xs font-bold text-amber-300">19:00</span>
+                      <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-center">
+                        <span className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider block">Thời gian</span>
+                        <span className="text-xs font-bold text-amber-300 block mt-0.5">17:00 – 21:30</span>
                       </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">Cổng vào</span>
-                        <span className="text-xs font-bold text-purple-300">Cổng 20 LTTr</span>
+                      <div className="p-2 rounded-xl bg-white/5 border border-white/10 text-center">
+                        <span className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider block">Cổng vào</span>
+                        <span className="text-xs font-bold text-white block mt-0.5">Cổng 20 LTTr</span>
                       </div>
                     </div>
 
@@ -455,18 +1115,51 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 mt-4">
+                {/* Tiện ích Phương án 2 & 3: Lưu vé về máy + Gửi lại vé về Email */}
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={handleDownloadTicket}
+                    disabled={isDownloading}
+                    className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs text-white font-medium flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5 text-amber-300" />
+                    )}
+                    <span>{isDownloading ? 'Đang tạo...' : 'Lưu vé về máy'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleResendTicketEmail}
+                    disabled={resendCooldown > 0 || isResending}
+                    className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs text-white font-medium flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isResending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-rose-400" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5 text-rose-300" />
+                    )}
+                    <span>
+                      {resendCooldown > 0 ? `Gửi lại (${resendCooldown}s)` : 'Gửi lại vé'}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-2">
                   <button
                     type="button"
                     onClick={() =>
                       onNotify?.(
                         'Đã lưu vé vào Apple Wallet / Google Wallet thành công! 🎟️',
-                        'purple'
+                        'emerald'
                       )
                     }
                     className="py-2.5 px-3 rounded-full bg-white/10 hover:bg-white/20 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition"
                   >
-                    <Bookmark className="w-3.5 h-3.5 text-purple-400" />
+                    <Bookmark className="w-3.5 h-3.5 text-rose-400" />
                     <span>Add to wallet</span>
                   </button>
                   <button
@@ -490,7 +1183,7 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsTicketOpen(false)}
-                  className="mt-2.5 w-full py-3 rounded-full font-bold text-white text-xs bg-gradient-to-r from-purple-600 via-indigo-600 to-rose-600 shadow-lg flex items-center justify-center gap-1.5 transition active:scale-95"
+                  className="mt-2.5 w-full py-3 rounded-full font-bold text-white text-xs bg-gradient-to-r from-[#8E2032] via-[#A8243A] to-[#C9334C] hover:from-[#A8243A] hover:to-[#DE3D58] shadow-lg shadow-[#8E2032]/40 flex items-center justify-center gap-1.5 transition active:scale-95"
                 >
                   <Check className="w-4 h-4" />
                   <span>Hoàn tất &amp; Quay lại trang chủ</span>
