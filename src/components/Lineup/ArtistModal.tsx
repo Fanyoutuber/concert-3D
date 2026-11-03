@@ -71,7 +71,7 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpe
       closeTimerRef.current = null;
       setClosing(false);
       onClose();
-    }, 200);
+    }, 300);
   };
 
   if (!artist) return null;
