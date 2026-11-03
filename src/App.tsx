@@ -432,7 +432,7 @@ export function App() {
                     >
                       <div
                         className="h-48 sm:h-56 rounded-xl bg-cover bg-center relative overflow-hidden transition-transform duration-500 group-hover:scale-105"
-                        style={{ backgroundImage: "url('assets/truong-tdn.jpg')" }}
+                        style={{ backgroundImage: "url('/assets/truong-tdn.jpg')" }}
                       >
                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
                         <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">

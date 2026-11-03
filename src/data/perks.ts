@@ -10,7 +10,7 @@ export const PERKS: Perk[] = [
     description:
       'Thẻ cứng bo góc hiệu ứng rượu vang loang nghệ thuật in dập nổi chữ bạc 3D độc quyền "ALO! TĐN XIN NGHE".',
     materialNote: 'Chất liệu cứng bóng cao cấp',
-    image: 'assets/ALO_TICKET-2.png',
+    image: '/assets/ALO_TICKET-2.png',
     iconName: 'sparkles',
     accentColor: 'rose',
   },
@@ -23,7 +23,7 @@ export const PERKS: Perk[] = [
     description:
       'Phiên bản nền đen huyền bí kết hợp typography bạc chrome phồng 3D cùng logo Trường THCS & THPT Trần Đại Nghĩa.',
     materialNote: 'Dập nổi logo trường',
-    image: 'assets/ALO_TICKET.png',
+    image: '/assets/ALO_TICKET.png',
     iconName: 'tag',
     accentColor: 'purple',
   },
@@ -36,7 +36,7 @@ export const PERKS: Perk[] = [
     description:
       'Set vòng tay festival vải dệt đa sắc màu phân biệt từng hạng vé và khu vực (Glamping VIP, StandART, Early Bird).',
     materialNote: 'Chống nước & xé rách',
-    image: 'assets/perk-wristband.png',
+    image: '/assets/perk-wristband.png',
     iconName: 'ticket',
     accentColor: 'cyan',
   },
@@ -49,7 +49,7 @@ export const PERKS: Perk[] = [
     description:
       'Bình / Ly giữ nhiệt thể thao 3 tone màu (Trắng tinh tế, Xanh Navy, Đỏ Hồng) trang bị quai xách tiện lợi cho concert.',
     materialNote: 'Giữ nhiệt nóng/lạnh bền bỉ',
-    image: 'assets/IMG_2351.png',
+    image: '/assets/IMG_2351.png',
     iconName: 'coffee',
     accentColor: 'amber',
   },

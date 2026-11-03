@@ -1044,7 +1044,7 @@ export const TicketSummary: React.FC<TicketSummaryProps> = ({
                 <div className="rounded-2xl overflow-hidden border border-white/15 bg-black/40 shadow-inner">
                   <div
                     className="h-28 relative overflow-hidden bg-cover bg-center"
-                    style={{ backgroundImage: "url('assets/truong-tdn.jpg')" }}
+                    style={{ backgroundImage: "url('/assets/truong-tdn.jpg')" }}
                   >
                     <div className="absolute inset-0 bg-gradient-to-t from-[#12080D] via-black/40 to-black/20" />
                     <div className="absolute bottom-2 left-3 right-3 text-left">

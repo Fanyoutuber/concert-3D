@@ -78,7 +78,7 @@ export const Hero: React.FC<HeroProps> = ({ onOpenBooking }) => {
           <div className="max-w-4xl mx-auto">
             <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden shadow-[0_20px_60px_-15px_rgba(107,23,36,0.5)] border border-white/15 group">
               <img
-                src="assets/ticket-banner.png"
+                src="/assets/ticket-banner.png"
                 alt="ALO! TĐN XIN NGHE Ticket Banner"
                 className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                 decoding="async"
