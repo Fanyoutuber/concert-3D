@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   Clock,
   MessageSquare,
@@ -17,22 +17,38 @@ export interface ArtistModalProps {
 }
 
 export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpenBooking }) => {
+  const [prevArtist, setPrevArtist] = useState<Artist | null>(null);
   const [selectedSubId, setSelectedSubId] = useState<string>('all');
   const [contentTab, setContentTab] = useState<'slogan' | 'setlist'>('slogan');
+  const [closing, setClosing] = useState(false);
+  const closeTimerRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  // Đồng bộ state ngay trong pha render khi đổi nghệ sĩ (tránh render kép gây giật animation)
+  if (artist !== prevArtist) {
+    setPrevArtist(artist);
+    setClosing(false);
     if (artist) {
-      if (artist.subArtists && artist.subArtists.length > 0) {
-        setSelectedSubId(artist.subArtists[0].id);
-      } else {
-        setSelectedSubId('all');
-      }
+      setSelectedSubId(artist.subArtists?.[0]?.id ?? 'all');
       setContentTab('slogan');
     }
+  }
+
+  // Dọn timer nếu đóng/mở nhanh liên tiếp hoặc unmount
+  useEffect(() => {
+    if (closeTimerRef.current !== null) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current);
+        closeTimerRef.current = null;
+      }
+    };
   }, [artist]);
 
-  // Khóa hoàn toàn tính năng cuộn trang chính khi modal mở (overflow: hidden cho body)
-  useEffect(() => {
+  // Khóa cuộn trang bằng useLayoutEffect (trước khi trình duyệt vẽ frame đầu của animation)
+  useLayoutEffect(() => {
     if (artist) {
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
@@ -42,20 +58,20 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpe
     }
   }, [artist]);
 
-  const [closing, setClosing] = useState(false);
-
-  useEffect(() => {
-    if (artist) setClosing(false);
-  }, [artist]);
-
   // Mobile: chạy animation trượt xuống rồi mới đóng; desktop đóng ngay
   const requestClose = () => {
+    if (closing || closeTimerRef.current !== null) return;
     if (window.matchMedia('(min-width: 1024px)').matches) {
+      setClosing(false);
       onClose();
       return;
     }
     setClosing(true);
-    window.setTimeout(onClose, 200);
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null;
+      setClosing(false);
+      onClose();
+    }, 200);
   };
 
   if (!artist) return null;
@@ -79,10 +95,10 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpe
       onClick={requestClose}
     >
       <div
-        className="sheet-panel bg-[#15070c] lg:bg-[#15070c]/95 w-full lg:max-w-2xl rounded-t-3xl lg:rounded-3xl border border-white/20 shadow-2xl overflow-hidden max-h-[88vh] lg:max-h-[92vh] flex flex-col"
+        className="sheet-panel bg-[#15070c] lg:bg-[#15070c]/95 w-full lg:max-w-2xl rounded-t-3xl lg:rounded-3xl border border-white/20 overflow-hidden max-h-[88vh] lg:max-h-[92vh] flex flex-col"
         style={
           {
-            boxShadow: `0 25px 80px -15px rgba(0,0,0,0.95), 0 0 40px ${artist.theme.glowSoft}`,
+            '--modal-glow': artist.theme.glowSoft,
           } as React.CSSProperties
         }
         onClick={(e) => e.stopPropagation()}
@@ -122,7 +138,8 @@ export const ArtistModal: React.FC<ArtistModalProps> = ({ artist, onClose, onOpe
               <img
                 src={artist.cutoutImage}
                 alt={artist.name}
-                className="max-h-44 sm:max-h-52 md:max-h-56 w-auto max-w-full object-contain object-bottom drop-shadow-[0_12px_25px_rgba(0,0,0,0.9)]"
+                decoding="async"
+                className="max-h-44 sm:max-h-52 md:max-h-56 w-auto max-w-full object-contain object-bottom lg:drop-shadow-[0_12px_25px_rgba(0,0,0,0.9)]"
               />
             </div>
             <div className="relative z-10 w-full text-center mt-2 pt-2 border-t border-white/10 shrink-0">

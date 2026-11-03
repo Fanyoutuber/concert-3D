@@ -1085,15 +1085,23 @@ h1, h2, h3, h4, .font-heading {
 }
 
 @media (max-width: 1023px) {
-  .sheet-overlay { animation: overlayIn 0.22s ease forwards; }
-  .sheet-overlay.is-closing { animation: overlayOut 0.2s ease forwards; }
+  .sheet-overlay {
+    animation: overlayIn 0.2s ease forwards;
+    overscroll-behavior: contain;
+  }
+  .sheet-overlay.is-closing {
+    animation: overlayOut 0.18s ease forwards;
+    pointer-events: none;
+  }
   .sheet-panel {
-    animation: sheetUp 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    animation: sheetUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
     will-change: transform;
+    backface-visibility: hidden;
+    contain: layout paint style;
     overscroll-behavior: contain;
   }
   .sheet-overlay.is-closing .sheet-panel {
-    animation: sheetDown 0.22s cubic-bezier(0.4, 0, 1, 1) forwards;
+    animation: sheetDown 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
   }
   .sheet-grabber {
     width: 40px;
@@ -1104,7 +1112,12 @@ h1, h2, h3, h4, .font-heading {
   }
 }
 @media (min-width: 1024px) {
-  .sheet-panel { animation: fadeInScale 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .sheet-panel {
+    animation: fadeInScale 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    box-shadow:
+      0 25px 80px -15px rgba(0, 0, 0, 0.95),
+      0 0 40px var(--modal-glow, rgba(255, 255, 255, 0.15));
+  }
   .sheet-grabber { display: none; }
 }
 
@@ -1200,17 +1213,18 @@ h1, h2, h3, h4, .font-heading {
     align-items: flex-end;
   }
 
-  .stage-artist-card .artist-cutout-img {
+  .stage-artist-card .artist-cutout-img,
+  .stage-artist-card:hover .artist-cutout-img,
+  .stage-artist-card.is-active .artist-cutout-img,
+  .artist-card-club:hover .artist-cutout-img,
+  .artist-card-dalab:hover .artist-cutout-img {
     max-height: 148px;
     width: 100%;
     object-fit: contain;
     object-position: bottom center;
-    transform: translate3d(0, 0, 0);
-    transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .stage-artist-card.is-active .artist-cutout-img {
-    transform: translate3d(0, -3px, 0) scale(1.05);
+    filter: none;
+    transform: none;
+    transition: none;
   }
 
   .stage-artist-card .stage-pedestal-ring {
@@ -1218,13 +1232,16 @@ h1, h2, h3, h4, .font-heading {
     bottom: 8px;
     width: 36%;
     height: 16px;
+    transition: none;
   }
 
-  .stage-artist-card .card-spotlight-cone {
+  .stage-artist-card .card-spotlight-cone,
+  .stage-artist-card:hover .card-spotlight-cone {
     left: 21%;
     width: 48%;
-    filter: blur(4px);
+    filter: none;
     mix-blend-mode: normal;
+    transition: none;
   }
 
   .stage-artist-card .card-bottom-info {

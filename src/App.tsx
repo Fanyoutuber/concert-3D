@@ -293,6 +293,10 @@ export function App() {
                       key={artist.key}
                       type="button"
                       onClick={() => {
+                        if (!window.matchMedia('(min-width: 1024px)').matches) {
+                          setActiveArtist(artist);
+                          return;
+                        }
                         if (activeArtistKey === artist.key) {
                           setActiveArtistKey(null);
                         } else {
